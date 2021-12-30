@@ -33,19 +33,25 @@ def _split_control(data: pd.DataFrame):
     return df_healthy, df_sick
 
 
-def summary(df: pd.DataFrame, log=False):
-    df_summary = df.groupby(["disease", "tissue"]).agg(
-        {"tpm_sum": ["min", "max", "median", "mean", ("3rd_quartile", lambda x: x.quantile(0.75))]}) \
-        .tpm_sum
-    return df_summary.apply(np.log2) if log else df_summary
-
-
 class Scoring:
     def __init__(self, df: pd.DataFrame):
+        self.df = df
         self.df_control, self.df_sick = _split_control(df)
         self.h_tissues = self.df_control.tissue.unique()
 
-    def score_abs(self, selection: [str], key: str, log=False):
+    def summary(self, log: bool):
+        df_summary = self.df.groupby(["disease", "tissue"]).agg(
+            {"tpm_sum": ["min", "max", "median", "mean", ("3rd_quartile", lambda x: x.quantile(0.75))]}) \
+            .tpm_sum
+        return df_summary.apply(np.log2) if log else df_summary
+
+    def score(self, selection: [str], log: bool, key: str = None):
+        if key in ['single', 'single_log', 'complete', 'complete_log']:
+            return self.score_without_group(selection, log, key)
+        scores = self.score_by_group(selection, log, key)
+        return scores.min()
+
+    def score_without_group(self, selection: [str], log: bool, key: str):
         hs = self.df_control[selection].sum(axis=1)
         ss = self.df_sick[selection].sum(axis=1)
 
@@ -54,7 +60,7 @@ class Scoring:
         fun = linkage_map[key]
         return fun(hs, ss)
 
-    def score_by_group(self, selection: [str], key=None, log=False):
+    def score_by_group(self, selection: [str], log: bool, key: str = None):
         hs = pd.DataFrame(index=self.df_control.index)
         hs['tissue'] = self.df_control.tissue
         hs['tpm_sum'] = self.df_control[selection].sum(axis=1, numeric_only=True)
@@ -73,9 +79,3 @@ class Scoring:
             df_scores[method] = fun(hs, ss)
 
         return df_scores
-
-    def score(self, selection: [str], key=None, log=False):
-        if key in ['single', 'single_log', 'complete', 'complete_log']:
-            return self.score_abs(selection, key, log)
-        scores = self.score_by_group(selection, key, log)
-        return scores.min()
