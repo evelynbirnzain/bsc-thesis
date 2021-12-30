@@ -1,6 +1,9 @@
+import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
+
+from scoring import Scoring
 
 
 def _y_minor_ticks(plot):
@@ -18,42 +21,49 @@ def _prettify_axes(plot):
     plt.tight_layout()
 
 
-def _summary(data):
-    return data.groupby(["disease", "tissue"]).agg(
-        {"tpm_sum": ["min", "max", "median", "mean", ("3rd_quartile", lambda x: x.quantile(0.75))]}) \
-        .tpm_sum.apply(np.log2)
-
-
 class Plotting:
-    def __init__(self, df_unscaled, scoring):
+    def __init__(self, df_unscaled: pd.DataFrame, scoring: Scoring):
         self.df_unscaled = df_unscaled
         self.tissues = list(df_unscaled.tissue.unique())
         self.scoring = scoring
 
-    def boxplot(self, selection, path=None):
+    def boxplot(self, selection: [str], log: bool, path: str = None):
         plt.clf()
         self.df_unscaled['tpm_sum'] = self.df_unscaled[selection].sum(axis=1)
         self.df_unscaled['tpm_sum_log'] = np.log2(self.df_unscaled['tpm_sum'])
 
+        key = "tpm_sum_log" if log else "tpm_sum"
         plot = sns.boxplot(
             data=self.df_unscaled,
             x="tissue",
-            y="tpm_sum_log",
-            hue="disease",
+            y=key,
+            hue="group",
             linewidth=1,
             flierprops=dict(markersize=2),
             dodge=False,
         )
 
-        plt.title(f"{len(selection)} selected antigens: {', '.join(selection)}")
-        plt.ylabel("log2(TPM sum)")
+        plt.title(f"{len(selection)} selected antigens: {', '.join(selection)}"
+                  if len(selection) <= 20 else f"{len(selection)} selected antigens")
+        plt.ylabel("log2(TPM sum)" if log else "TPM sum")
 
         _prettify_axes(plot)
-        self._plot_summary_stats(selection)
+        self._plot_summary_stats(selection, log)
+
         if path:
             plot.get_figure().savefig(path, format="svg", bbox_inches="tight")
 
         return plot
+
+    def _plot_summary_stats(self, selection: [str], log: bool):
+        scores = self.scoring.score(selection, log=log)
+        summary = self.scoring.summary(log)
+        key1, key2 = "single", "median"
+        if log:
+            key1, key2 = key1 + "_log", key2 + "_log"
+
+        x = self._plot_lg(summary, scores, key1, "max", "min", 1)
+        self._plot_lg(summary, scores, key2, "median", "median", 0.5, x)
 
     lw = 0.7
 
@@ -61,8 +71,8 @@ class Plotting:
         plt.axhline(y, color=c, alpha=a, linewidth=self.lw)
 
     def _plot_lg(self, sm, scores, ln, hk, sk, alpha, prev_x=None):
-        sm_h = sm.loc['control'][hk].max()
-        sm_s = sm.loc['neuroblastoma'][sk].min()
+        sm_h = sm.loc[False][hk].max()
+        sm_s = sm.loc[True][sk].min()
 
         col = "red" if scores[ln] < 0 else "green"
         self._l_hline(sm_h, col, alpha)
@@ -92,10 +102,3 @@ class Plotting:
             rotation=rotation,
         )
         return x
-
-    def _plot_summary_stats(self, selection):
-        scores = self.scoring.score(selection, log=True)
-        sm = _summary(self.df_unscaled)
-
-        x = self._plot_lg(sm, scores, "single_log", "max", "min", 1)
-        self._plot_lg(sm, scores, "median_log", "median", "median", 0.5, x)
