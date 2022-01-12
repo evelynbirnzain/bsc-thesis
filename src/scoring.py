@@ -2,7 +2,7 @@ import pandas as pd
 
 import numpy as np
 
-linkage_map_abs = {
+_linkage_map_abs = {
     "single": lambda h, s: s.min() - h.max(),
     # "complete": lambda h, s: s.max() - h.min(),
     "median": lambda h, s: s.median() - h.median(),
@@ -12,8 +12,8 @@ linkage_map_abs = {
 
 }
 
-linkage_map_log = {
-    "single_log": lambda h, s: np.log2(s.min()) - np.log2(h.max()),  # TODO +1
+_linkage_map_log = {
+    "single_log": lambda h, s: np.log2(s.min()) - np.log2(h.max()),  # TODO +1?
     # "complete_log": lambda h, s: s.max() - h.min(),
     "median_log": lambda h, s: np.log2(s.median()) - np.log2(h.median()),
     "average_log": lambda h, s: np.log2(s.mean()) - np.log2(h.mean()),
@@ -21,11 +21,11 @@ linkage_map_log = {
     "quantile_log": lambda h, s: np.log2(s.quantile(0.05)) - np.log2(h.quantile(0.95)),
 }
 
-log_linkages = linkage_map_log.keys()
-abs_linkages = linkage_map_abs.keys()
+log_linkages = list(_linkage_map_log.keys())
+abs_linkages = list(_linkage_map_abs.keys())
 
-linkage_map = dict(linkage_map_abs)
-linkage_map.update(linkage_map_log)
+_linkage_map = dict(_linkage_map_abs)
+_linkage_map.update(_linkage_map_log)
 
 
 def _split_control(data: pd.DataFrame):
@@ -59,7 +59,7 @@ class Scoring:
 
         if log:
             key = key + '_log'
-        fun = linkage_map[key]
+        fun = _linkage_map[key]
         return fun(hs, ss)
 
     def score_by_group(self, selection: [str], log: bool, key: str = None):
@@ -73,11 +73,11 @@ class Scoring:
             key = key + '_log'
 
         if key:
-            fun = linkage_map[key]
+            fun = _linkage_map[key]
             return fun(hs, ss)
 
         df_scores = pd.DataFrame(data=None, index=self.h_tissues)
-        for method, fun in linkage_map.items():
+        for method, fun in _linkage_map.items():
             df_scores[method] = fun(hs, ss)
 
         return df_scores

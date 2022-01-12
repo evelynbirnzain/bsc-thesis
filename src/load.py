@@ -4,19 +4,6 @@ import os
 from io_utils import RUNS_DIR, EVAL_DIR
 
 
-def load_df(path):
-    df = pd.read_csv(path, dtype={"disease": str})
-    df = df.fillna(value={"disease": "control"})
-    df = df.iloc[:, 2:]
-    df = df[df.source != "hOB"]
-    df = df[
-        (df.tissue != "Cells - EBV-transformed lymphocytes")
-        & (df.tissue != "Cells - Cultured fibroblasts")
-        ]
-
-    return df
-
-
 def load_solutions(ns):
     dfs = []
     for n in ns:
@@ -38,13 +25,13 @@ def load_solutions(ns):
 
         try:
             temp3 = pd.read_csv(
-                f"{EVAL_DIR}/{n}_single_log_median_log_average_log_quartile_log_quantile_log.csv" # TODO
+                f"{EVAL_DIR}/{n}_single_log_median_log_average_log_quartile_log_quantile_log.csv"  # TODO
             )
             temp3["approach"] = "new"
         except FileNotFoundError:
             temp3 = pd.DataFrame()
             print("Didn't find new solutions")
-        #df = pd.concat([temp1, temp2, temp3]).sort_values("single", ascending=False).reset_index(drop=True)
+        # df = pd.concat([temp1, temp2, temp3]).sort_values("single", ascending=False).reset_index(drop=True)
         df = temp3.sort_values("single_log", ascending=False).iloc[:, 1:].reset_index(drop=True)
         dfs.append(df)
     return dfs
@@ -58,17 +45,16 @@ class Results:
         for df, run in zip(dfs, runs):
             df['run_id'] = run.split('/')[-1]
         conc = pd.concat(dfs)
-        #print(conc)
+        # print(conc)
         sols = conc[[str(i) for i in range(num_genes)]]
         sols = sols.drop_duplicates()
         metrics = sols.apply(lambda x: self.scoring.score(x, log=True), axis=1)
-        #metrics_log = sols.apply(lambda x: self.scoring.score(x, log=True), axis=1)
+        # metrics_log = sols.apply(lambda x: self.scoring.score(x, log=True), axis=1)
         sols = pd.concat([sols, metrics], axis=1)
         sols = sols.join(conc['run_id'])
         print(list(sols.columns))
         sols = sols.sort_values(by="single_log", ascending=False)
         return sols
-
 
     def collect_and_save(self, num_genes, metrics):
         runs = next(os.walk(RUNS_DIR))[1]
