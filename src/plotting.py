@@ -64,6 +64,7 @@ class Plotting:
 
         x = self._plot_lg(summary, scores, key1, "max", "min", 1)
         self._plot_lg(summary, scores, key2, "median", "median", 0.5, x)
+        self._plot_lg(summary, scores, "quartile_log", "3rd_quartile", "1st_quartile", 0.5, x)
 
     lw = 0.7
 
@@ -71,14 +72,19 @@ class Plotting:
         plt.axhline(y, color=c, alpha=a, linewidth=self.lw)
 
     def _plot_lg(self, sm, scores, ln, hk, sk, alpha, prev_x=None):
-        sm_h = sm.loc[False][hk].max()
-        sm_s = sm.loc[True][sk].min()
+        sm = sm.reset_index()
+        sm_h = sm.loc[~sm.disease][hk].max()
+        sm_s = sm.loc[sm.disease][sk].min()
 
         col = "red" if scores[ln] < 0 else "green"
         self._l_hline(sm_h, col, alpha)
         self._l_hline(sm_s, col, alpha)
-        grp = sm[sm[hk] == sm_h].index[0][1]
+        grp = sm[sm[hk] == sm_h].tissue.iloc[0]
+        # print(sm[sm[hk] == sm_h].tissue)
+        # print(sm[sm[hk] == sm_h].tissue.iloc[0])
+
         x = self.tissues.index(grp)
+        # print(x)
         ymin = min(sm_h, sm_s)
         ymax = max(sm_h, sm_s)
         plt.vlines(

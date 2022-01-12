@@ -4,24 +4,26 @@ import numpy as np
 import pandas as pd
 import os
 import io_utils
+from scoring import Scoring
+from plotting import Plotting
 
 
 class GA:
-    num_generations = 10
-    num_parents_mating = 10
-    sol_per_pop = 20
+    num_generations = 100000
+    num_parents_mating = 20
+    sol_per_pop = 500
     init_range_low = 0
     parent_selection_type = "sss"
-    keep_parents = 6
+    keep_parents = 10
     crossover_type = "single_point"
     random_mutation_min_val = 0
     mutation_by_replacement = True
-    mutation_type = "random"
-    mutation_percent_genes = 20
-    stop_criteria = ["saturate_30000"]
+    mutation_type = "adaptive"
+    mutation_percent_genes = (15, 8)
+    stop_criteria = ["saturate_10000"]
     instance = None
 
-    def __init__(self, genes, scoring, plotting, init_pop_weights=None):
+    def __init__(self, genes: [str], scoring: Scoring, plotting: Plotting, init_pop_weights=None):
         self.genes = genes
         self.init_range_high = len(self.genes) - 1
         self.gene_space = range(0, len(self.genes))
@@ -30,11 +32,11 @@ class GA:
         self.scoring = scoring
         self.init_pop_weights = init_pop_weights
 
-    def _fitness_func(self, solution, idx, key):
+    def _fitness_func(self, solution: [int], idx, key: str, log: bool):
         selected_genes = self.genes[solution]
-        return self.scoring.score(selected_genes, key)
+        return self.scoring.score(selected_genes, log, key)
 
-    def _initial_population(self, num_genes):
+    def _initial_population(self, num_genes: int):
         sols = []
         for _ in range(self.sol_per_pop):
             sel = list(self.init_pop_weights.sample(num_genes, weights=self.init_pop_weights).index)
@@ -42,7 +44,9 @@ class GA:
             sols.append(enc)
         return sols
 
-    def run_and_save_instance(self, fitness_func, num_genes, meth):
+    def run_and_save_instance(self, num_genes: int, meth: str, log: bool):
+        fitness_func = lambda x, y: self._fitness_func(x, y, meth, log)
+
         with tqdm(total=self.num_generations) as pbar:
             self.instance = pygad.GA(
                 num_generations=self.num_generations,
@@ -70,19 +74,21 @@ class GA:
                 self.instance.initial_population = self._initial_population(num_genes)
             self.instance.run()
 
-        self._save_results(meth)
+        self._save_results(meth, log)
 
-    def _save_results(self, meth):
+    def _save_results(self, meth: str, log: bool):
         best_sols = self.instance.best_solutions
         sols = pd.DataFrame(best_sols).apply(lambda x: self.genes[x])
         sols = io_utils.sort_genes(sols)
-        sols = pd.concat([sols, sols.apply(self.scoring.score, axis=1)], axis=1).sort_values(by="single")
+        # TODO
+        sols = pd.concat([sols, sols.apply(lambda x: self.scoring.score(x, log=log), axis=1)], axis=1)
+        sols = sols.sort_values(by=meth)
 
         run_dir = io_utils.create_run_dir(meth, self.instance.num_genes)
         sols.to_csv(os.path.join(run_dir, "best_sols.csv"), index=False)
         self.instance.plot_fitness().savefig(os.path.join(run_dir, "fit_vs_gen.svg"), format="svg")
 
         solution, solution_fitness, solution_idx = self.instance.best_solution()
-        self.plotting.boxplot(self.genes[solution], os.path.join(run_dir, "best_sol.svg"))
+        self.plotting.boxplot(self.genes[solution], log, os.path.join(run_dir, "best_sol.svg"))
 
         np.save(os.path.join(run_dir, "last_pop"), self.instance.population)

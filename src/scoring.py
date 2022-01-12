@@ -9,6 +9,7 @@ linkage_map_abs = {
     "average": lambda h, s: s.mean() - h.mean(),
     "quartile": lambda h, s: s.quantile(0.25) - h.quantile(0.75),
     "quantile": lambda h, s: s.quantile(0.05) - h.quantile(0.95),
+
 }
 
 linkage_map_log = {
@@ -41,7 +42,8 @@ class Scoring:
 
     def summary(self, log: bool):
         df_summary = self.df.groupby(["disease", "tissue"]).agg(
-            {"tpm_sum": ["min", "max", "median", "mean", ("3rd_quartile", lambda x: x.quantile(0.75))]}) \
+            {"tpm_sum": ["min", "max", "median", "mean", ("3rd_quartile", lambda x: x.quantile(0.75)),
+                         ("1st_quartile", lambda x: x.quantile(0.25))]}) \
             .tpm_sum
         return df_summary.apply(np.log2) if log else df_summary
 
