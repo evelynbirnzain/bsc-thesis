@@ -25,9 +25,9 @@ def load_solutions(ns):
 
         try:
             temp3 = pd.read_csv(
-                f"{EVAL_DIR}/{n}_single_log_median_log_average_log_quartile_log_quantile_log.csv"  # TODO
+                f"{EVAL_DIR}/{n}_single.csv"  # TODO
             )
-            temp3["approach"] = "new"
+            temp3["approach"] = "ga"
         except FileNotFoundError:
             temp3 = pd.DataFrame()
             print("Didn't find new solutions")

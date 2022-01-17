@@ -1,4 +1,3 @@
-import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
@@ -22,16 +21,17 @@ def _prettify_axes(plot):
 
 
 class Plotting:
-    def __init__(self, df_unscaled: pd.DataFrame, scoring: Scoring):
-        self.df_unscaled = df_unscaled
-        self.tissues = list(df_unscaled.tissue.unique())
+    def __init__(self, scoring: Scoring):
+        self.df_unscaled = scoring.df
+        self.tissues = list(self.df_unscaled.tissue.unique())
         self.scoring = scoring
 
     def boxplot(self, selection: [str], log: bool, path: str = None):
         plt.clf()
         self.df_unscaled['tpm_sum'] = self.df_unscaled[selection].sum(axis=1)
         self.df_unscaled['tpm_sum_log'] = np.log2(self.df_unscaled['tpm_sum'])
-
+        pal = sns.color_palette()
+        pal = [pal[0], pal[2], pal[1]]
         key = "tpm_sum_log" if log else "tpm_sum"
         plot = sns.boxplot(
             data=self.df_unscaled,
@@ -41,6 +41,7 @@ class Plotting:
             linewidth=1,
             flierprops=dict(markersize=2),
             dodge=False,
+            palette=pal
         )
 
         plt.title(f"{len(selection)} selected antigens: {', '.join(selection)}"
@@ -58,15 +59,17 @@ class Plotting:
     def _plot_summary_stats(self, selection: [str], log: bool):
         scores = self.scoring.score(selection, log=log)
         summary = self.scoring.summary(log)
-        key1, key2 = "single", "median"
+        key1, key2, key3 = "single", "iqr", "median"
         if log:
-            key1, key2 = key1 + "_log", key2 + "_log"
+            key1, key2, key3 = key1 + "_log", key2 + "_log", key3 + "_log"
 
         x = self._plot_lg(summary, scores, key1, "max", "min", 1)
-        self._plot_lg(summary, scores, key2, "median", "median", 0.5, x)
-        self._plot_lg(summary, scores, "quartile_log", "3rd_quartile", "1st_quartile", 0.5, x)
+        x = self._plot_lg(summary, scores, key2, "outlier_upper", "outlier_lower", 0.50) # TODO
+        self._plot_lg(summary, scores, key3, "median", "median", 0.3, x)
+        # self._plot_lg(summary, scores, "quartile_log", "3rd_quartile", "1st_quartile", 0.5, x)
 
     lw = 0.7
+
 
     def _l_hline(self, y, c, a):
         plt.axhline(y, color=c, alpha=a, linewidth=self.lw)
@@ -80,11 +83,10 @@ class Plotting:
         self._l_hline(sm_h, col, alpha)
         self._l_hline(sm_s, col, alpha)
         grp = sm[sm[hk] == sm_h].tissue.iloc[0]
-        # print(sm[sm[hk] == sm_h].tissue)
-        # print(sm[sm[hk] == sm_h].tissue.iloc[0])
 
         x = self.tissues.index(grp)
         # print(x)
+
         ymin = min(sm_h, sm_s)
         ymax = max(sm_h, sm_s)
         plt.vlines(
